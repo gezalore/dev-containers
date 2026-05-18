@@ -52,7 +52,6 @@ From: rockylinux/rockylinux:8.10
         ncurses-compat-libs \
         ncurses-devel \
         numactl \
-        openssh-server \
         perf \
         perl \
         podman \
@@ -74,12 +73,6 @@ From: rockylinux/rockylinux:8.10
     # Clean up
     dnf clean all
     rm -rf /var/cache/dnf
-
-    ######################################################################
-    # sshd config
-
-    ssh-keygen -A  # Generate SSH host keys
-    echo "SetEnv APPTAINER_SSH=1" >> /etc/ssh/sshd_config
 
     ######################################################################
     # Python packages
@@ -183,14 +176,6 @@ From: rockylinux/rockylinux:8.10
 
 %environment
     export LC_ALL=C.UTF-8
-
-%startscript
-    #!/bin/bash
-    if [[ "$#" -ne 1 ]]; then
-      echo "Provide SSH port number as argument"
-      exit 1
-    fi
-    /usr/sbin/sshd -D -p "$1" -o UsePAM=no
 
 %runscript
     #!/bin/bash
