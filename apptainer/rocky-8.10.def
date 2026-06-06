@@ -10,15 +10,15 @@ From: rockylinux/rockylinux:8.10
 
     dnf install -y dnf-plugins-core epel-release
     dnf config-manager --set-enabled powertools
+    dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
 
-    # Install packages
+    # Install packages -- sort with .+1,/^$/-1!sort
     dnf -y install \
         autoconf \
         boost1.78-devel \
         boost1.78-static \
         cairo-devel \
         cairo-gobject-devel \
-        cargo \
         clang-20.1.8 \
         clang-devel-20.1.8 \
         clang-tools-extra-20.1.8 \
@@ -30,7 +30,9 @@ From: rockylinux/rockylinux:8.10
         gcc-toolset-14-libasan-devel \
         gcc-toolset-14-libatomic-devel \
         gcc-toolset-14-libubsan-devel \
+        gh \
         git \
+        git-lfs \
         glib2-devel \
         gobject-introspection-devel \
         gperftools \
@@ -41,14 +43,16 @@ From: rockylinux/rockylinux:8.10
         jemalloc-devel \
         jq \
         lcov \
+        libXScrnSaver \
+        libevent-devel \
         libglvnd-glx \
         libnsl \
         libpng12 \
-        libXScrnSaver \
         lld-20.1.8 \
         lz4-devel \
         make \
         mold \
+        moreutils \
         ncurses-compat-libs \
         ncurses-devel \
         numactl \
@@ -60,7 +64,6 @@ From: rockylinux/rockylinux:8.10
         redhat-lsb-core \
         rsync \
         strace \
-        tmux \
         valgrind \
         vmtouch \
         wget \
@@ -90,7 +93,7 @@ From: rockylinux/rockylinux:8.10
     ######################################################################
     # Install nodejs version manager 'n' and never nodejs
 
-    curl -fsSL -o /usr/local/bin/n https://raw.githubusercontent.com/tj/n/master/bin/n 
+    curl -fsSL -o /usr/local/bin/n https://raw.githubusercontent.com/tj/n/master/bin/n
     chmod 0755 /usr/local/bin/n
     n install 24
 
@@ -98,6 +101,14 @@ From: rockylinux/rockylinux:8.10
     # Install Claude CLI
 
     npm install -g @anthropic-ai/claude-code
+
+    ######################################################################
+    # Install rustup and rust/cargo
+
+    export RUSTUP_HOME=/opt/rustup
+    export CARGO_HOME=/opt/cargo
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.92.0
+    export PATH="$CARGO_HOME/bin:$PATH"
 
     ######################################################################
     # Install wavetools
@@ -114,6 +125,44 @@ From: rockylinux/rockylinux:8.10
     make install
     popd
     rm -rf vim
+
+    ######################################################################
+    # Build and install a recent version of bison
+
+    BISON=bison-3.8.2
+    wget https://mirror.cyberbits.eu/gnu/bison/$BISON.tar.xz
+    tar xJfv $BISON.tar.xz
+    pushd $BISON
+    ./configure
+    make -j$(nproc)
+    make install
+    popd
+    rm -rf $BISON.tar.xz $BISON
+
+    ######################################################################
+    # Build and install recent tmux - needs bison
+
+    git clone https://github.com/tmux/tmux.git tmux
+    pushd tmux
+    git checkout 3.6a
+    sh autogen.sh
+    ./configure
+    make -j$(nproc)
+    make install
+    popd
+    rm -rf tmux
+
+    ######################################################################
+    # Build and install a recent version of ccache
+
+    git clone https://github.com/ccache/ccache.git ccache
+    pushd ccache
+    git checkout v4.13.6
+    mkdir build
+    cmake -S . -B build -D CMAKE_BUILD_TYPE=Release
+    cmake --build build -j$(nproc) -- install
+    popd
+    rm -rf ccache
 
     ######################################################################
     # Build and install SystemC
@@ -149,31 +198,6 @@ From: rockylinux/rockylinux:8.10
     popd
     rm -rf bear
 
-    ######################################################################
-    # Build and install a recent version of bison
-
-    BISON=bison-3.8.2
-    wget https://mirror.cyberbits.eu/gnu/bison/$BISON.tar.xz
-    tar xJfv $BISON.tar.xz
-    pushd $BISON
-    ./configure
-    make -j$(nproc)
-    make install
-    popd
-    rm -rf $BISON.tar.xz $BISON
-
-    ######################################################################
-    # Build and install a recent version of ccache
-
-    git clone https://github.com/ccache/ccache.git ccache
-    pushd ccache
-    git checkout v4.13.6
-    mkdir build
-    cmake -S . -B build -D CMAKE_BUILD_TYPE=Release
-    cmake --build build -j$(nproc) -- install
-    popd
-    rm -rf ccache
-
 %environment
     export LC_ALL=C.UTF-8
 
@@ -181,8 +205,4 @@ From: rockylinux/rockylinux:8.10
     #!/bin/bash
     echo "=== Rocky Linux 8.10 Dev Container ==="
     source scl_source enable gcc-toolset-14
-    if [[ "$#" -eq 0 ]]; then
-      exec "${SHELL:-/bin/sh}"
-    else
-      exec "${SHELL:-/bin/sh}" -lc "$(printf '%q ' "$@")"
-    fi
+    exec "${SHELL:-/bin/sh}" "$@"
